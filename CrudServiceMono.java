@@ -89,6 +89,44 @@ public class CrudService {
     }
 
     // ====================================================================
+    // 2b. READ (ONE) - Recupera un singolo record tramite ID
+    // ====================================================================
+    public Dipendente getById(long id) {
+        String sql = "SELECT * FROM DIPENDENTI WHERE id = ?";
+        Dipendente d = null;
+
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setLong(1, id);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    d = new Dipendente();
+                    d.setId(rs.getLong("id"));
+                    d.setNome(rs.getString("nome"));
+                    d.setCognome(rs.getString("cognome"));
+                    d.setCodiceFiscale(rs.getString("codice_fiscale"));
+                    d.setGenere(rs.getString("genere"));
+                    
+                    Date dataNascita = rs.getDate("data_di_nascita");
+                    if (dataNascita != null) {
+                        d.setDataDiNascita(dataNascita.toLocalDate());
+                    }
+                    
+                    d.setLuogoNascita(rs.getString("luogo_nascita"));
+                    d.setContatto(rs.getString("contatto"));
+                    d.setTitoloStudio(rs.getString("titolo_studio"));
+                    d.setRuoloAziendale(rs.getString("ruolo_aziendale"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return d;
+    }
+
+    // ====================================================================
     // 3. UPDATE - Aggiorna i dati di un dipendente esistente tramite ID
     // ====================================================================
     public void update(Dipendente dipendente) {
