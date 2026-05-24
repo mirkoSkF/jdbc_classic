@@ -178,6 +178,117 @@ public class CrudService {
     }
 
     // ====================================================================
+    // 2b. READ (ONE) - Recupera un singolo dipendente completando tutte le relazioni
+    // ====================================================================
+    public Dipendente getById(long id) {
+        String sqlDipendente = "SELECT d.*, r.denominazione AS ruolo_desc, a.id AS acc_id, a.username, a.password " +
+                               "FROM dipendenti d " +
+                               "LEFT JOIN ruoli_aziendali r ON d.ruolo_id = r.id " +
+                               "LEFT JOIN accounts a ON d.id = a.dipendente_id " +
+                               "WHERE d.id = ?";
+        
+        String sqlContatti = "SELECT c.*, tc.denominazione AS tipo_desc " +
+                             "FROM contatti c " +
+                             "LEFT JOIN tipi_contatto tc ON c.tipo_contatto_id = tc.id " +
+                             "WHERE c.dipendente_id = ?";
+        
+        String sqlTitoli = "SELECT ts.* FROM titoli_studio ts " +
+                           "JOIN dipendenti_titoli dt ON ts.id = dt.titolo_studio_id " +
+                           "WHERE dt.dipendente_id = ?";
+
+        Dipendente d = null;
+
+        try (Connection conn = getConnection()) {
+            
+            // 1. Recupero l'anagrafica base, il Ruolo e l'Account
+            try (PreparedStatement psDip = conn.prepareStatement(sqlDipendente)) {
+                psDip.setLong(1, id);
+                try (ResultSet rs = psDip.executeQuery()) {
+                    if (rs.next()) {
+                        d = new Dipendente();
+                        d.setId(rs.getLong("id"));
+                        d.setNome(rs.getString("nome"));
+                        d.setCognome(rs.getString("cognome"));
+                        d.setCodiceFiscale(rs.getString("codice_fiscale"));
+                        d.setGenere(rs.getString("genere"));
+                        
+                        Date dataNascita = rs.getDate("data_di_nascita");
+                        if (dataNascita != null) {
+                            d.setDataDiNascita(dataNascita.toLocalDate());
+                        }
+                        d.setLuogoNascita(rs.getString("luogo_nascita"));
+
+                        // Mappa il Ruolo (N:1)
+                        long ruoloId = rs.getLong("ruolo_id");
+                        if (!rs.wasNull()) {
+                            RuoloAziendale r = new RuoloAziendale();
+                            r.setId(ruoloId);
+                            r.setDenominazione(rs.getString("ruolo_desc"));
+                            d.setRuolo(r);
+                        }
+
+                        // Mappa l'Account (1:1)
+                        long accId = rs.getLong("acc_id");
+                        if (!rs.wasNull()) {
+                            Account acc = new Account();
+                            acc.setId(accId);
+                            acc.setUsername(rs.getString("username"));
+                            acc.setPassword(rs.getString("password"));
+                            d.setAccount(acc); // Il setter interno imposta già la bidirezionalità
+                        }
+                    }
+                }
+            }
+
+            // Se il dipendente esiste, vado a recuperare le sue liste collegate
+            if (d != null) {
+                
+                // 2. Recupero i Contatti (1:N)
+                try (PreparedStatement psCont = conn.prepareStatement(sqlContatti)) {
+                    psCont.setLong(1, id);
+                    try (ResultSet rsCont = psCont.executeQuery()) {
+                        while (rsCont.next()) {
+                            Contatto contatto = new Contatto();
+                            contatto.setId(rsCont.getLong("id"));
+                            contatto.setValore(rsCont.getString("valore"));
+                            
+                            // Popola il tipo di contatto associato
+                            long tipoId = rsCont.getLong("tipo_contatto_id");
+                            if (!rsCont.wasNull()) {
+                                TipoContatto tc = new TipoContatto();
+                                tc.setId(tipoId);
+                                tc.setDenominazione(rsCont.getString("tipo_desc"));
+                                contatto.setTipoContatto(tc);
+                            }
+                            
+                            d.getContatti().add(contatto);
+                        }
+                    }
+                }
+
+                // 3. Recupero i Titoli di Studio attraverso la tabella pivot (M:N)
+                try (PreparedStatement psTit = conn.prepareStatement(sqlTitoli)) {
+                    psTit.setLong(1, id);
+                    try (ResultSet rsTit = psTit.executeQuery()) {
+                        while (rsTit.next()) {
+                            TitoloStudio titolo = new TitoloStudio();
+                            titolo.setId(rsTit.getLong("id"));
+                            titolo.setDenominazione(rsTit.getString("denominazione")); // Assume colonna denominazione o simile
+                            
+                            d.getTitoliStudio().add(titolo);
+                        }
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return d;
+    }
+
+    // ====================================================================
     // 3. UPDATE - Aggiorna i dati anagrafici e riallinea le tabelle collegate
     // ====================================================================
     public void update(Dipendente dipendente) {
