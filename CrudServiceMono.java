@@ -89,19 +89,23 @@ public class CrudService {
     }
 
     // ====================================================================
-    // 2b. READ (ONE) - Recupera un singolo record tramite ID
+    // 2b. READ (ONE) - Recupera un singolo record tramite ID (usando first())
     // ====================================================================
     public Dipendente getById(long id) {
         String sql = "SELECT * FROM DIPENDENTI WHERE id = ?";
         Dipendente d = null;
 
+        // ATTENZIONE: Dobbiamo esplicitare il tipo di ResultSet SCROLLABLE
         try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+             PreparedStatement ps = conn.prepareStatement(sql, 
+                     ResultSet.TYPE_SCROLL_INSENSITIVE, 
+                     ResultSet.CONCUR_READ_ONLY)) {
 
             ps.setLong(1, id);
 
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
+                // Posiziona il cursore sulla prima riga assoluta del ResultSet
+                if (rs.first()) { 
                     d = new Dipendente();
                     d.setId(rs.getLong("id"));
                     d.setNome(rs.getString("nome"));
