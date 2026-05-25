@@ -7,6 +7,7 @@ import java.util.List;
 import connettore.Connettore;
 import model.Categoria;
 import model.Marca;
+import model.Ordine;
 import model.Prodotto;
 
 public class CrudService implements ICrudService {
@@ -227,5 +228,60 @@ public class CrudService implements ICrudService {
 		return null;
 	}
 
-	
+	@Override
+	public Ordine leggiOrdine(int id) {
+		Connettore connettore = new Connettore();
+		Connection conn = connettore.apriConnessione();
+		PreparedStatement ps = null;
+		ResultSet rs = null;
+		Ordine ordine = new Ordine();
+		String comandoSQL = "select * from ordini where id=?";
+		try {
+			ps = conn.prepareStatement(comandoSQL);
+			ps.setInt(1, id);
+			rs = ps.executeQuery();
+			if(rs.next()) {
+				ordine.setId(rs.getInt("id"));
+				ordine.setSerialeOrdine(rs.getString("seriale_ordine"));
+				return ordine;
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				rs.close();
+				ps.close();
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		return null;
+	}
+
+	@Override
+	public boolean accoppia(Prodotto prodotto, Ordine ordine) {
+		Connettore connettore = new Connettore();
+		Connection conn = connettore.apriConnessione();
+		PreparedStatement ps = null;
+		String comandoSQL = "insert into ordini_prodotti (id_prodotto,id_ordine) values (?,?)";
+		try {
+			ps = conn.prepareStatement(comandoSQL);
+			ps.setInt(1, prodotto.getId());
+			ps.setInt(2, ordine.getId());
+			ps.execute();
+			return true;
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				ps.close();
+				conn.close(); //chiusura effettiva delle connessione
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		return false;
+	}
+
 }
